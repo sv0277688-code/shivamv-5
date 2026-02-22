@@ -14,7 +14,7 @@ uploaded_file = st.file_uploader("Upload IMDB Dataset CSV", type="csv")
 if uploaded_file is not None:
 
     # Load dataset
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(IMDB_DATASET.csv)
 
     # Map sentiment labels
     df['sentiment'] = df['sentiment'].map({'positive': 1, 'negative': 0})
@@ -72,3 +72,4 @@ if uploaded_file is not None:
         prediction = nb.predict(vec)[0]
         sentiment = "Positive" if prediction == 1 else "Negative"
         st.write(f"Sentiment: {sentiment}")
+
