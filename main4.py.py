@@ -1,75 +1,56 @@
-import streamlit as st
 import pandas as pd
+import joblib
+import re
+import string
+
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
 
-st.title("IMDB Sentiment Analysis")
+# Load dataset
+df = pd.read_csv("imdb_dataset.csv")
 
-uploaded_file = st.file_uploader("Upload IMDB Dataset CSV", type="csv")
+# Clean sentiment column (remove extra spaces)
+df['sentiment'] = df['sentiment'].str.strip()
 
-if uploaded_file is not None:
+# Map labels
+df['sentiment'] = df['sentiment'].map({'positive': 1, 'negative': 0})
 
-    # Load dataset
-    df = pd.read_csv(IMDB_DATASET.csv)
+# Text cleaning function
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r"http\S+|www\S+", "", text)
+    text = re.sub(r"\d+", "", text)
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text
 
-    # Map sentiment labels
-    df['sentiment'] = df['sentiment'].map({'positive': 1, 'negative': 0})
+df['review'] = df['review'].apply(clean_text)
 
-    st.write("Dataset Preview:")
-    st.write(df.head())
+# Split
+X_train, X_test, y_train, y_test = train_test_split(
+    df['review'],
+    df['sentiment'],
+    test_size=0.2,
+    random_state=42,
+    stratify=df['sentiment']
+)
 
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        df['review'],
-        df['sentiment'],
-        test_size=0.2,
-        random_state=42,
-        stratify=df['sentiment']
-    )
+# TF-IDF
+vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+X_train_tfidf = vectorizer.fit_transform(X_train)
+X_test_tfidf = vectorizer.transform(X_test)
 
-    # TF-IDF
-    tfidf = TfidfVectorizer(stop_words='english', max_features=5000)
-    X_train_tfidf = tfidf.fit_transform(X_train)
-    X_test_tfidf = tfidf.transform(X_test)
+# Train model
+model = MultinomialNB()
+model.fit(X_train_tfidf, y_train)
 
-    # Train model
-    nb = MultinomialNB()
-    nb.fit(X_train_tfidf, y_train)
+# Accuracy
+accuracy = accuracy_score(y_test, model.predict(X_test_tfidf))
+print("Accuracy:", accuracy)
 
-    # Predictions
-    y_pred = nb.predict(X_test_tfidf)
+# Save model & vectorizer
+joblib.dump(model, "model.pkl")
+joblib.dump(vectorizer, "vectorizer.pkl")
 
-    # Accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    st.write(f"Accuracy: {accuracy:.4f}")
-
-    # Confusion Matrix
-    fig, ax = plt.subplots()
-    sns.heatmap(
-        confusion_matrix(y_test, y_pred),
-        annot=True,
-        fmt='d',
-        cmap='mako',
-        ax=ax,
-        xticklabels=["Negative", "Positive"],
-        yticklabels=["Negative", "Positive"]
-    )
-    ax.set_title("Sentiment Analysis Confusion Matrix")
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
-
-    st.pyplot(fig)
-
-    # User review prediction
-    user_review = st.text_input("Test a Review")
-
-    if user_review:
-        vec = tfidf.transform([user_review])
-        prediction = nb.predict(vec)[0]
-        sentiment = "Positive" if prediction == 1 else "Negative"
-        st.write(f"Sentiment: {sentiment}")
-
+print("Model and vectorizer saved successfully!")
